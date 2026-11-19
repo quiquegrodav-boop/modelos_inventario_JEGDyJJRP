@@ -1,0 +1,291 @@
+# Creado el 6 de noviembre del 2026
+# Por Juan Enrique Guerrero Davalos y Jonathan de Jesus Rodriguez Perez
+# Modelos de inventario - Investigación de Operaciones
+
+import math
+import numpy as np
+import pandas as pd
+import streamlit as st
+
+st.set_page_config(
+    page_title="Modelos de Inventario - IO", page_icon="📦", layout="centered"
+)
+
+# --- PRESENTACIÓN / PORTADA ---
+st.markdown(
+    """
+    <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); padding: 2rem; border-radius: 1rem; color: white; text-align: center; margin-bottom: 2rem;">
+        <h1 style="margin:0; font-size: 2.2rem;">📊 Modelos de Inventario</h1>
+        <p style="margin:0.5rem 0 0 0; font-size: 1.1rem; opacity: 0.9;">Investigación de Operaciones</p>
+        <hr style="border: 0.5px solid rgba(255,255,255,0.3); margin: 1rem 0;">
+        <p style="margin:0; font-size: 1rem;"><b>Desarrollado por:</b></p>
+        <p style="margin:0.2rem 0; font-size: 1.1rem;">👨‍💻 Juan Enrique Guerrero Dávalos</p>
+        <p style="margin:0; font-size: 1.1rem;">👨‍💻 Jonathan de Jesús Rodríguez Pérez</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+def tiempo(t):
+  meses = t * 12
+  dias = meses * 30
+  return f"{t:.4f} años  =  {meses:.2f} meses  =  {dias:.2f} días"
+
+
+def n2(x):
+  return f"{x:.2f}"
+
+
+def compra_sin_deficit(D, C1, C2, C3):
+  Q = math.sqrt(2 * C2 * D / C3)
+  N = D / Q
+  t = Q / D
+  Ct = C1 * D + C2 * N + C3 * Q / 2
+  return dict(
+      Q=Q,
+      N=N,
+      t=t,
+      Ct=Ct,
+      costo_txt=(
+          f"C_T = {n2(C1)}({n2(D)}) + {n2(C2)}({n2(N)}) + "
+          rf"\frac{{{n2(C3)}({n2(Q)})}}{{2}}"
+      ),
+      partes=[C1 * D, C2 * N, C3 * Q / 2],
+  )
+
+
+def compra_con_deficit(D, C1, C2, C3, C4):
+  Q = math.sqrt(2 * C2 * D / C3) * math.sqrt((C3 + C4) / C4)
+  S = C3 * Q / (C3 + C4)
+  Im = Q - S
+  N = D / Q
+  t = Q / D
+  t1 = Im / D
+  t2 = t - t1
+  Ct = C1 * D + C2 * N + C3 * Im ** 2 / (2 * Q) + C4 * S ** 2 / (2 * Q)
+  return dict(
+      Q=Q,
+      S=S,
+      Im=Im,
+      N=N,
+      t=t,
+      t1=t1,
+      t2=t2,
+      Ct=Ct,
+      costo_txt=(
+          f"C_T = {n2(C1)}({n2(D)}) + {n2(C2)}({n2(N)}) + "
+          rf"\frac{{{n2(C3)}({n2(Im)})^2}}{{2({n2(Q)})}} + "
+          rf"\frac{{{n2(C4)}({n2(S)})^2}}{{2({n2(Q)})}}"
+      ),
+      partes=[C1 * D, C2 * N, C3 * Im ** 2 / (2 * Q), C4 * S ** 2 / (2 * Q)],
+  )
+
+
+def manufactura_sin_deficit(D, R, C1, C2, C3):
+  k = 1 - D / R
+  Q = math.sqrt(2 * C2 * D / C3 * R / (R - D))
+  N = D / Q
+  t = Q / D
+  t1 = Q / R
+  t2 = t - t1
+  Im = Q * k
+  Ct = C1 * D + C2 * N + C3 * Im / 2
+  return dict(
+      k=k,
+      Q=Q,
+      N=N,
+      t=t,
+      t1=t1,
+      t2=t2,
+      Im=Im,
+      Ct=Ct,
+      costo_txt=(
+          f"C_T = {n2(C1)}({n2(D)}) + {n2(C2)}({n2(N)}) + "
+          rf"\frac{{{n2(C3)}({n2(Im)})}}{{2}}"
+      ),
+      partes=[C1 * D, C2 * N, C3 * Im / 2],
+  )
+
+
+def manufactura_con_deficit(D, R, C1, C2, C3, C4):
+  k = 1 - D / R
+  Q = math.sqrt(2 * C2 * D / (C3 * k)) * math.sqrt((C3 + C4) / C4)
+  S = C3 / (C3 + C4) * Q * k
+  Im = Q * k - S
+  N = D / Q
+  t = Q / D
+  Ct = (
+      C1 * D
+      + C2 * N
+      + C3 * Im ** 2 / (2 * Q) * (1 / k)
+      + C4 * S ** 2 / (2 * Q) * (1 / k)
+  )
+  return dict(
+      k=k,
+      Q=Q,
+      S=S,
+      Im=Im,
+      N=N,
+      t=t,
+      Ct=Ct,
+      costo_txt=(
+          f"C_T = {n2(C1)}({n2(D)}) + {n2(C2)}({n2(N)}) + "
+          rf"\frac{{{n2(C3)}({n2(Im)})^2}}{{2({n2(Q)})}}\cdot\frac{{1}}{{{k:.4f}}}"
+          " + "
+          rf"\frac{{{n2(C4)}({n2(S)})^2}}{{2({n2(Q)})}}\cdot\frac{{1}}{{{k:.4f}}}"
+      ),
+      partes=[
+          C1 * D,
+          C2 * N,
+          C3 * Im ** 2 / (2 * Q) / k,
+          C4 * S ** 2 / (2 * Q) / k,
+      ],
+  )
+
+
+# --- SELECCIÓN DE MODELO Y PARÁMETROS ---
+st.sidebar.header("⚙️ Configuración")
+modelo = st.sidebar.selectbox(
+    "**SELECCIONE EL MODELO**",
+    [
+        "Compra sin déficit",
+        "Compra con déficit",
+        "Manufactura sin déficit",
+        "Manufactura con déficit",
+    ],
+)
+
+es_manuf = modelo.startswith("Manufactura")
+hay_deficit = modelo.endswith("con déficit")
+
+st.subheader("📝 Parámetros de Entrada")
+col1, col2 = st.columns(2)
+with col1:
+  D = st.number_input(
+      "**DEMANDA (unidades / año)**", min_value=1.0, value=20000.0, step=100.0
+  )
+  C1 = st.number_input("**COSTO UNITARIO ($ / u)**", min_value=0.0, value=100.0)
+  C2 = st.number_input(
+      "**COSTO DE PEDIDO ($ / pedido)**", min_value=0.01, value=300.0
+  )
+with col2:
+  c3_val = st.number_input(
+      "**COSTO DE MANTENIMIENTO ($ / u)**", min_value=0.0001, value=2.0
+  )
+  c3_per = st.radio(
+      "**El costo de mantenimiento está dado por:**",
+      ["**año**", "**mes**"],
+      horizontal=True,
+  )
+  C3 = c3_val * 12 if c3_per == "**mes**" else c3_val
+  if hay_deficit:
+    C4 = st.number_input(
+        "**COSTO DE DÉFICIT ($ / u / año)**", min_value=0.0001, value=5.0
+    )
+  if es_manuf:
+    r_val = st.number_input(
+        "**CAPACIDAD DE PRODUCCIÓN (u)**", min_value=1.0, value=36000.0, step=100.0
+    )
+    r_per = st.radio(
+        "**La capacidad está dada por:**", ["**año**", "**mes**"], horizontal=True
+    )
+    R = r_val * 12 if r_per == "**mes**" else r_val
+
+if c3_per == "mes":
+  st.caption(f"C3 ajustado = {c3_val} × 12 = ${C3:.2f} por año")
+if es_manuf:
+  if r_per == "mes":
+    st.caption(f"R ajustado = {r_val:,.0f} × 12 = {R:,.0f} u/año")
+  if R <= D:
+    st.error("⚠️ **La capacidad de producción (R) debe ser mayor que la demanda (D).**")
+    st.stop()
+
+# Ejecución del modelo seleccionado
+if modelo == "Compra sin déficit":
+  r = compra_sin_deficit(D, C1, C2, C3)
+elif modelo == "Compra con déficit":
+  r = compra_con_deficit(D, C1, C2, C3, C4)
+elif modelo == "Manufactura sin déficit":
+  r = manufactura_sin_deficit(D, R, C1, C2, C3)
+else:
+  r = manufactura_con_deficit(D, R, C1, C2, C3, C4)
+
+# --- RESULTADOS ---
+st.divider()
+st.subheader("🎯 Resultados Óptimos")
+
+res_col1, res_col2 = st.columns(2)
+with res_col1:
+  st.metric(
+      label="Cantidad Óptima (Q*)", value=f"{r['Q']:,.2f} u/pedido"
+  )
+  st.metric(label="Pedidos / Tandas por año (N)", value=f"{r['N']:.2f}")
+with res_col2:
+  st.metric(label="Tiempo entre pedidos (t)", value=tiempo(r['t']))
+  if hay_deficit:
+    st.metric(label="Déficit Máximo (S)", value=f"{r['S']:,.2f} u")
+    st.metric(label="Inventario Máximo (Im)", value=f"{r['Im']:,.2f} u")
+  elif es_manuf:
+    st.metric(label="Inventario Máximo (Im)", value=f"{r['Im']:,.2f} u")
+
+if "t1" in r:
+  nombre1 = (
+      "⏱️ Tiempo de manufactura" if es_manuf else "⏱️ Tiempo con inventario"
+  )
+  st.write(f"**{nombre1}** = {tiempo(r['t1'])}")
+if "t2" in r:
+  nombre2 = "⏱️ Tiempo sin producir" if es_manuf else "⏱️ Tiempo con déficit"
+  st.write(f"**{nombre2}** = {tiempo(r['t2'])}")
+
+# --- COSTO TOTAL ---
+st.divider()
+st.subheader("💰 Costo Total Anual")
+st.markdown(
+    f"""
+<div style="
+       background: linear-gradient(135deg, #e6f7ec 0%, #d4edda 100%);
+       color:#155724;
+       padding:1.2rem;
+       border-radius:0.5rem;
+       text-align:center;
+       font-weight:bold;
+       font-size:1.5rem;
+       border: 1px solid #c3e6cb;">
+&#36;{r['Ct']:,.2f} por año
+</div>
+    """,
+    unsafe_allow_html=True,
+)
+
+# --- GRÁFICA INTERACTIVA DE COSTOS (Valor agregado visual) ---
+st.markdown("---")
+st.subheader("📈 Análisis Gráfico del Comportamiento del Costo")
+st.write(
+    "Visualiza cómo varía el costo total al modificar el tamaño del lote $Q$:"
+)
+
+# Generar puntos para la curva de costos
+q_vals = np.linspace(max(100, r["Q"] * 0.2), r["Q"] * 2.5, 100)
+if modelo == "Compra sin déficit":
+  costos_totales = (C1 * D) + (C2 * (D / q_vals)) + (C3 * q_vals / 2)
+elif modelo == "Compra con déficit":
+  # Aproximación visual del costo con déficit
+  costos_totales = (
+      (C1 * D)
+      + (C2 * (D / q_vals))
+      + (C3 * ((q_vals - (C3 * q_vals / (C3 + C4))) ** 2) / (2 * q_vals))
+      + (C4 * ((C3 * q_vals / (C3 + C4)) ** 2) / (2 * q_vals))
+  )
+else:
+  # Curva generalizada para manufactura
+  k_factor = (
+      r["k"] if "k" in r else 1.0
+  )  # Simplified visual curve representation
+  costos_totales = (C1 * D) + (C2 * (D / q_vals)) + (C3 * q_vals * k_factor / 2)
+
+df_chart = pd.DataFrame(
+    {"Tamaño de Lote (Q)": q_vals, "Costo Total ($)": costos_totales}
+).set_index("Tamaño de Lote (Q)")
+
+st.line_chart(df_chart)
